@@ -25,7 +25,7 @@ public record NewUserPayload(
         @Size(min = 4, message = "La password deve contenere almeno 4 caratteri")
         String password,
 
-        @NotBlank(message = "il ruolo è obbligatorio (Scegli tra utente_normale o ornanizzatore")
+        @NotBlank(message = "il ruolo è obbligatorio (Scegli tra UTENTE o ORGANIZZATORE")
         String ruolo
 ) {
 }
