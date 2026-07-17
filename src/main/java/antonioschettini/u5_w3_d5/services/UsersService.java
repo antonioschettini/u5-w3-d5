@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -17,9 +18,11 @@ import java.util.UUID;
 @Service
 public class UsersService {
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UsersService(UserRepository userRepository) {
+    public UsersService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     // salvo uno user e controllo se email e username sono già in uso
@@ -37,8 +40,8 @@ public class UsersService {
         nuovoUtente.setEmail(body.email());
         nuovoUtente.setUsername(body.username());
 
-        // todo: bcrypt per la protezione password
-        nuovoUtente.setPassword(body.password());
+        // bcrypt per le pssw
+        nuovoUtente.setPassword(passwordEncoder.encode(body.password()));
 
         try {
             nuovoUtente.setRuolo(Ruolo.valueOf(body.ruolo().toUpperCase()));

@@ -4,6 +4,7 @@ import antonioschettini.u5_w3_d5.entities.Evento;
 import antonioschettini.u5_w3_d5.entities.Prenotazione;
 import antonioschettini.u5_w3_d5.entities.User;
 import antonioschettini.u5_w3_d5.exceptions.BadRequestException;
+import antonioschettini.u5_w3_d5.exceptions.ForbiddenException;
 import antonioschettini.u5_w3_d5.exceptions.NotFoundException;
 import antonioschettini.u5_w3_d5.recordDTO.NewPrenotazionePayload;
 import antonioschettini.u5_w3_d5.repositories.PrenotazioneRepository;
@@ -28,17 +29,15 @@ public class PrenotazioniService {
         this.eventiService = eventiService;
     }
 
-    // Crea una prenotazione eseguendo tutti i controlli richiesti
-    public Prenotazione save(NewPrenotazionePayload body) {
-        User utente = usersService.findById(body.idUtente());
+    // creo una prenotazione
+    public Prenotazione save(NewPrenotazionePayload body, User currentUser) {
+        // uso il currentuser per verificare il token
         Evento evento = eventiService.findById(body.idEvento());
-
-        // CONTROLLO 1: L'utente ha già prenotato questo specifico evento?
-        if (prenotazioneRepository.existsByUtenteAndEvento(utente, evento)) {
+        // se ho già effettuato la prenotazione lancio l'eccezione
+        if (prenotazioneRepository.existsByUtenteAndEvento(currentUser, evento)) {
             throw new BadRequestException("Hai già prenotato un posto per questo evento!");
         }
-
-        // CONTROLLO 2: Ci sono ancora posti liberi?
+        // se i posti sono esauriti lancio eccezione
         long postiOccupati = prenotazioneRepository.countByEvento(evento);
         if (postiOccupati >= evento.getPostiTotali()) {
             throw new BadRequestException("Spiacenti, i posti per l'evento '" + evento.getTitolo() + "' sono esauriti!");
@@ -46,29 +45,35 @@ public class PrenotazioniService {
 
         Prenotazione nuovaPrenotazione = new Prenotazione();
         nuovaPrenotazione.setDataPrenotazione(LocalDate.now());
-        nuovaPrenotazione.setUtente(utente);
+        nuovaPrenotazione.setUtente(currentUser);
         nuovaPrenotazione.setEvento(evento);
 
         return prenotazioneRepository.save(nuovaPrenotazione);
     }
 
-    // Mostra tutte le prenotazioni fatte a sistema (paginate)
+    // get di tutte le prenotazioni
     public Page<Prenotazione> findAll(int page, int size, String sortBy) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortBy));
         return prenotazioneRepository.findAll(pageable);
     }
 
-    // Mostra solo le prenotazioni di un determinato utente (paginate - per la funzione EXTRA)
+    // get di tutte le prenotazioni fatte da un utente
     public Page<Prenotazione> findByUtente(UUID idUtente, int page, int size, String sortBy) {
         User utente = usersService.findById(idUtente);
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortBy));
         return prenotazioneRepository.findByUtente(utente, pageable);
     }
 
-    // Annulla una prenotazione (cancella il biglietto)
-    public void delete(UUID idPrenotazione) {
+    // cancella una prenotazione
+    public void delete(UUID idPrenotazione, User currentUser) {
         Prenotazione trovata = prenotazioneRepository.findById(idPrenotazione)
                 .orElseThrow(() -> new NotFoundException("Prenotazione non trovata!"));
+
+        // un utente può cancellare la prenotazione solo se è la sua
+        if (!trovata.getUtente().getIdUser().equals(currentUser.getIdUser())) {
+            throw new ForbiddenException("Non sei autorizzato a cancellare una prenotazione di un altro utente.");
+        }
+
         prenotazioneRepository.delete(trovata);
     }
 }

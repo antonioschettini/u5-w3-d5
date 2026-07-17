@@ -2,7 +2,6 @@ package antonioschettini.u5_w3_d5.services;
 
 import antonioschettini.u5_w3_d5.entities.Evento;
 import antonioschettini.u5_w3_d5.entities.User;
-import antonioschettini.u5_w3_d5.enums.Ruolo;
 import antonioschettini.u5_w3_d5.exceptions.ForbiddenException;
 import antonioschettini.u5_w3_d5.exceptions.NotFoundException;
 import antonioschettini.u5_w3_d5.recordDTO.NewEventoPayload;
@@ -18,22 +17,13 @@ import java.util.UUID;
 @Service
 public class EventiService {
     private final EventoRepository eventoRepository;
-    private final UsersService usersService;
 
-    public EventiService(EventoRepository eventoRepository, UsersService usersService) {
+    public EventiService(EventoRepository eventoRepository) {
         this.eventoRepository = eventoRepository;
-        this.usersService = usersService;
     }
 
-    // creo un nuovo evento collegandolo all'organizzatore ed è possibile crearlo solo se sei un organizzatore
-    public Evento save(NewEventoPayload body, UUID idOrganizzatore) {
-        User organizzatore = usersService.findById(idOrganizzatore);
-
-        // solo se sei un organizzatore puoi procedere
-        if (!organizzatore.getRuolo().equals(Ruolo.ORGANIZZATORE)) {
-            throw new ForbiddenException("Accesso negato! Solo gli organizzatori possono creare eventi.");
-        }
-
+    //uso l'utente estratto dal token una volta loggato
+    public Evento save(NewEventoPayload body, User organizzatore) {
         Evento nuovoEvento = new Evento();
         nuovoEvento.setTitolo(body.titolo());
         nuovoEvento.setDescrizione(body.descrizione());
@@ -45,21 +35,24 @@ public class EventiService {
         return eventoRepository.save(nuovoEvento);
     }
 
-    // lista di tutti gli eventi
     public Page<Evento> findAll(int page, int size, String sortBy) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortBy));
         return eventoRepository.findAll(pageable);
     }
 
-    // cerca un evento per id
     public Evento findById(UUID idEvento) {
         return eventoRepository.findById(idEvento)
                 .orElseThrow(() -> new NotFoundException("Evento con ID " + idEvento + " non trovato!"));
     }
 
-    // modifica un evento esistente
-    public Evento update(UUID idEvento, NewEventoPayload body) {
+    // update con verifica se l'utente loggato è il proprietario dell'evento
+    public Evento update(UUID idEvento, NewEventoPayload body, User currentUser) {
         Evento trovato = this.findById(idEvento);
+
+        if (!trovato.getOrganizzatore().getIdUser().equals(currentUser.getIdUser())) {
+            throw new ForbiddenException("Accesso negato! Non puoi modificare un evento creato da un altro organizzatore.");
+        }
+
         trovato.setTitolo(body.titolo());
         trovato.setDescrizione(body.descrizione());
         trovato.setData(body.data());
@@ -68,9 +61,14 @@ public class EventiService {
         return eventoRepository.save(trovato);
     }
 
-    // cancello un evento
-    public void delete(UUID idEvento) {
+    // delete con controllo se l'utente è il proprietario dell'evento
+    public void delete(UUID idEvento, User currentUser) {
         Evento trovato = this.findById(idEvento);
+
+        if (!trovato.getOrganizzatore().getIdUser().equals(currentUser.getIdUser())) {
+            throw new ForbiddenException("Accesso negato! Non puoi eliminare un evento creato da un altro organizzatore.");
+        }
+
         eventoRepository.delete(trovato);
     }
 }

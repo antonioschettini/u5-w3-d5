@@ -5,6 +5,7 @@ import antonioschettini.u5_w3_d5.recordDTO.NewUserPayload;
 import antonioschettini.u5_w3_d5.services.UsersService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,9 +33,14 @@ public class UsersController {
     public Page<User> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "id") String sortBy
+            @RequestParam(defaultValue = "idUser") String sortBy
     ) {
         return usersService.findAll(page, size, sortBy);
+    }
+
+    @GetMapping("/me")
+    public User getMyProfile(@AuthenticationPrincipal User currentUser) {
+        return currentUser;
     }
 
     // get by id
